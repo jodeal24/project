@@ -924,7 +924,7 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>{t.login}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-2">
+        <div className="grid gap-2">
             <Label htmlFor="pw">{t.password}</Label>
             <Input
               id="pw"
