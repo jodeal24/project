@@ -12,7 +12,6 @@ import { Card, CardContent } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
-import { Label } from "./components/ui/label";
 
 /**
  * StreamJoy — Vite + React version (client-only)
@@ -925,7 +924,7 @@ export default function App() {
             <DialogTitle>{t.login}</DialogTitle>
           </DialogHeader>
         <div className="grid gap-2">
-            <Label htmlFor="pw">{t.password}</Label>
+            <label htmlFor="pw" className="text-sm font-medium">{t.password}</label>
             <Input
               id="pw"
               type="password"
