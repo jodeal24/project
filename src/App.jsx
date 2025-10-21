@@ -312,70 +312,19 @@ const Row = ({ title, items, onItem }) => {
 // ------------------------- Player with multi-audio & subs -------------------------
 function Player({ episode, t, onClose }) {
   const videoRef = useRef(null);
-  const audioRef = useRef(null);
-  const [audioSelection, setAudioSelection] = useState("video"); // "video" or index into episode.audios
-  const [subSelection, setSubSelection] = useState("off"); // lang or "off"
-
-  useEffect(() => {
-    const v = videoRef.current;
-    const a = audioRef.current;
-    if (!v || !a) return;
-
-    const sync = () => {
-      if (Math.abs(a.currentTime - v.currentTime) > 0.3) {
-        a.currentTime = v.currentTime;
-      }
-      if (v.paused && !a.paused) a.pause();
-      if (!v.paused && a.paused) a.play().catch(() => {});
-    };
-
-    const onPlay = () => { if (audioSelection !== "video") a.play().catch(() => {}); };
-    const onPause = () => { if (audioSelection !== "video") a.pause(); };
-    const onSeek = () => { if (audioSelection !== "video") a.currentTime = v.currentTime; };
-
-    const int = setInterval(sync, 500);
-    v.addEventListener("play", onPlay);
-    v.addEventListener("pause", onPause);
-    v.addEventListener("seeking", onSeek);
-    v.addEventListener("ratechange", () => { if (audioSelection !== "video") a.playbackRate = v.playbackRate; });
-
-    return () => {
-      clearInterval(int);
-      v.removeEventListener("play", onPlay);
-      v.removeEventListener("pause", onPause);
-      v.removeEventListener("seeking", onSeek);
-    };
-  }, [audioSelection]);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    const a = audioRef.current;
-    if (!v || !a) return;
-    if (audioSelection === "video") {
-      v.muted = false;
-      a.pause();
-    } else {
-      v.muted = true;
-      a.currentTime = v.currentTime;
-      a.playbackRate = v.playbackRate;
-      if (!v.paused) a.play().catch(() => {});
-    }
-  }, [audioSelection]);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose?.(); }}>
       <DialogContent className="max-w-5xl p-0 overflow-hidden bg-black text-white">
         <div className="relative">
-          <video ref={videoRef} className="w-full bg-black" controls poster={episode.backdropUrl || episode.posterUrl}>
+          <video
+            ref={videoRef}
+            className="w-full bg-black"
+            controls
+            poster={episode.backdropUrl || episode.posterUrl}
+          >
             <source src={episode.videoUrl} />
-            {subSelection !== "off" &&
-              episode.subtitles?.filter((s) => s.lang === subSelection).map((s, idx) => (
-                <track key={idx} label={s.lang} kind="subtitles" srcLang={s.lang} src={s.url} default />
-              ))}
           </video>
-
-          {/* External audio element for alternate languages */}
-          <audio ref={audioRef} src={audioSelection === "video" ? undefined : episode.audios?.[parseInt(audioSelection)]?.url} />
 
           <Button
             variant="secondary"
@@ -387,49 +336,17 @@ function Player({ episode, t, onClose }) {
           </Button>
         </div>
 
-        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 bg-gradient-to-b from-black to-zinc-900">
-          <div className="md:col-span-2">
-            <h3 className="text-xl font-semibold mb-1">{episode.title}</h3>
-            {episode.description && <p className="text-sm text-white/80">{episode.description}</p>}
-          </div>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Headphones className="w-4 h-4" />
-              <span className="text-sm w-24">{t.audio}</span>
-              <Select value={audioSelection} onValueChange={setAudioSelection}>
-                <SelectTrigger className="bg-white/10 border-white/10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-white/10">
-                  <SelectItem value="video">{t.off} ({t.audio} in video)</SelectItem>
-                  {episode.audios?.map((a, idx) => (
-                    <SelectItem key={idx} value={String(idx)}>{a.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Captions className="w-4 h-4" />
-              <span className="text-sm w-24">{t.subtitles}</span>
-              <Select value={subSelection} onValueChange={setSubSelection}>
-                <SelectTrigger className="bg-white/10 border-white/10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-white/10">
-                  <SelectItem value="off">{t.off}</SelectItem>
-                  {episode.subtitles?.map((s, idx) => (
-                    <SelectItem key={idx} value={s.lang}>{s.lang}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div className="p-4 bg-gradient-to-b from-black to-zinc-900">
+          <h3 className="text-xl font-semibold mb-1">{episode.title}</h3>
+          {episode.description && (
+            <p className="text-sm text-white/80">{episode.description}</p>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 // ------------------------- Admin Panels -------------------------
 function AdminPanel({ db, setDB, t }) {
@@ -565,164 +482,88 @@ function EpisodeForm({ t, db, onSubmit, openSeries }) {
   const [description, setDescription] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
 
-  const [audios, setAudios] = useState([]); // {label,url}
-  const [subtitles, setSubtitles] = useState([]); // {lang,url}
-
-  useEffect(() => { if (openSeries) setSeriesId(openSeries); }, [openSeries]);
+  useEffect(() => {
+    if (openSeries) setSeriesId(openSeries);
+  }, [openSeries]);
 
   const series = db.series;
   const seasons = series.find((s) => s.id === seriesId)?.seasons || [];
 
-  const addAudio = () => setAudios((prev) => [...prev, { label: "", url: "" }]);
-  const addSub = () => setSubtitles((prev) => [...prev, { lang: "en", url: "" }]);
-
   return (
     <div className="grid gap-3 p-4 rounded-2xl bg-white/5">
+      {/* Select Series */}
       <Select value={seriesId} onValueChange={setSeriesId}>
         <SelectTrigger className="bg-white/10 border-white/10">
           <SelectValue placeholder={t.series} />
         </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-white/10">
           {series.map((s) => (
-            <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+            <SelectItem key={s.id} value={s.id}>
+              {s.title}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
+      {/* Select Season */}
       <Select value={seasonId} onValueChange={setSeasonId}>
         <SelectTrigger className="bg-white/10 border-white/10">
           <SelectValue placeholder={t.season} />
         </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-white/10">
           {seasons.map((se) => (
-            <SelectItem key={se.id} value={se.id}>{t.season} {se.number}</SelectItem>
+            <SelectItem key={se.id} value={se.id}>
+              {t.season} {se.number}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
+      {/* Episode Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Input placeholder={`${t.title}`} value={title} onChange={(e) => setTitle(e.target.value)} />
-        <Input type="number" min={1} placeholder="#" value={number} onChange={(e) => setNumber(parseInt(e.target.value || "1"))} />
-      </div>
-      <Input placeholder={t.description} value={description} onChange={(e) => setDescription(e.target.value)} />
-      <Input placeholder={t.videoUrl} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} />
-
-      <div className="bg-white/5 rounded-xl p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Headphones className="w-4 h-4" /><span className="font-medium">{t.audio}</span>
-        </div>
-        <div className="space-y-2">
-          {audios.map((a, idx) => (
-            <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Input placeholder={t.audioLabel} value={a.label} onChange={(e) => setAudios((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))} />
-              <Input placeholder={t.audioUrl} value={a.url} onChange={(e) => setAudios((prev) => prev.map((x, i) => (i === idx ? { ...x, url: e.target.value } : x)))} />
-            </div>
-          ))}
-          <Button variant="outline" onClick={addAudio}><Plus className="w-4 h-4 mr-2" /> {t.audio}</Button>
-        </div>
+        <Input
+          placeholder={t.title}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <Input
+          type="number"
+          min={1}
+          placeholder="#"
+          value={number}
+          onChange={(e) => setNumber(parseInt(e.target.value || "1"))}
+        />
       </div>
 
-      <div className="bg-white/5 rounded-xl p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Captions className="w-4 h-4" /><span className="font-medium">{t.subtitles}</span>
-        </div>
-        <div className="space-y-2">
-          {subtitles.map((s, idx) => (
-            <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Input placeholder={t.subtitleLang} value={s.lang} onChange={(e) => setSubtitles((prev) => prev.map((x, i) => (i === idx ? { ...x, lang: e.target.value } : x)))} />
-              <Input placeholder={t.subtitleUrl} value={s.url} onChange={(e) => setSubtitles((prev) => prev.map((x, i) => (i === idx ? { ...x, url: e.target.value } : x)))} />
-            </div>
-          ))}
-          <Button variant="outline" onClick={addSub}><Plus className="w-4 h-4 mr-2" /> {t.subtitles}</Button>
-        </div>
-      </div>
+      <Input
+        placeholder={t.description}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+      <Input
+        placeholder={t.videoUrl}
+        value={videoUrl}
+        onChange={(e) => setVideoUrl(e.target.value)}
+      />
 
+      {/* Save Button */}
       <Button
         disabled={!seriesId || !seasonId || !title || !videoUrl}
         onClick={() => {
-          onSubmit(seriesId, seasonId, { title, number, description, videoUrl, audios, subtitles });
-          setTitle(""); setNumber(1); setDescription(""); setVideoUrl(""); setAudios([]); setSubtitles([]);
+          onSubmit(seriesId, seasonId, {
+            title,
+            number,
+            description,
+            videoUrl,
+          });
+          setTitle("");
+          setNumber(1);
+          setDescription("");
+          setVideoUrl("");
         }}
       >
         <UploadCloud className="w-4 h-4 mr-2" /> {t.addEpisode}
       </Button>
-    </div>
-  );
-}
-
-function ManageLibrary({ t, db, updateSeries, deleteSeries, updateEpisode, deleteEpisode }) {
-  const [editingSeriesId, setEditingSeriesId] = useState(null);
-  const [editingEpisode, setEditingEpisode] = useState(null); // { seriesId, seasonId, ep }
-
-  const series = db.series;
-
-  return (
-    <div className="space-y-6">
-      {series.length === 0 && <div className="text-sm opacity-70">{t.libraryEmpty}</div>}
-
-      {series.map((s) => (
-        <div key={s.id} className="rounded-2xl border border-black/10 p-4 bg-white/50">
-          {editingSeriesId === s.id ? (
-            <div className="grid md:grid-cols-2 gap-2 mb-3">
-              <Input defaultValue={s.title} onChange={(e) => (s.title = e.target.value)} />
-              <Input defaultValue={s.posterUrl} onChange={(e) => (s.posterUrl = e.target.value)} />
-              <Input defaultValue={s.backdropUrl} onChange={(e) => (s.backdropUrl = e.target.value)} />
-              <Input defaultValue={s.description} onChange={(e) => (s.description = e.target.value)} />
-              <div className="flex gap-2 col-span-full">
-                <Button onClick={() => { updateSeries(s.id, s); setEditingSeriesId(null); }}>{t.save}</Button>
-                <Button variant="outline" onClick={() => setEditingSeriesId(null)}>{t.cancel}</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-semibold">{s.title}</div>
-                {s.description && <div className="text-sm opacity-70">{s.description}</div>}
-              </div>
-              <div className="flex gap-2">
-                <Button size="icon" variant="ghost" onClick={() => setEditingSeriesId(s.id)}><Pencil /></Button>
-                <Button size="icon" variant="ghost" onClick={() => deleteSeries(s.id)}><Trash2 /></Button>
-              </div>
-            </div>
-          )}
-
-          {s.seasons?.sort((a, b) => a.number - b.number).map((season) => (
-            <div key={season.id} className="mt-3">
-              <div className="font-medium mb-1">{MESSAGES.en.season} {season.number}</div>
-              <div className="space-y-2">
-                {season.episodes?.sort((a, b) => a.number - b.number).map((ep) => (
-                  <div key={ep.id} className="rounded-xl bg-white/70 p-3">
-                    {editingEpisode && editingEpisode.ep.id === ep.id ? (
-                      <div className="grid md:grid-cols-2 gap-2">
-                        <Input defaultValue={ep.title} onChange={(e) => (ep.title = e.target.value)} />
-                        <Input type="number" defaultValue={ep.number} onChange={(e) => (ep.number = parseInt(e.target.value || "1"))} />
-                        <Input defaultValue={ep.description} onChange={(e) => (ep.description = e.target.value)} />
-                        <Input defaultValue={ep.videoUrl} onChange={(e) => (ep.videoUrl = e.target.value)} />
-                        <div className="col-span-full flex gap-2">
-                          <Button onClick={() => { updateEpisode(s.id, season.id, ep.id, ep); setEditingEpisode(null); }}>{t.save}</Button>
-                          <Button variant="outline" onClick={() => setEditingEpisode(null)}>{t.cancel}</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-3">
-                        <div className="w-16 h-10 rounded bg-gradient-to-br from-indigo-200 to-sky-200" />
-                        <div className="flex-1">
-                          <div className="font-medium">{ep.number}. {ep.title}</div>
-                          {ep.description && <div className="text-sm text-zinc-600 line-clamp-2">{ep.description}</div>}
-                        </div>
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => setEditingEpisode({ seriesId: s.id, seasonId: season.id, ep })}><Pencil /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => deleteEpisode(s.id, season.id, ep.id)}><Trash2 /></Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ))}
     </div>
   );
 }
