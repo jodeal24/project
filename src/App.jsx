@@ -560,7 +560,6 @@ function SeasonForm({ t, db, onSubmit, onOpenSeries }) {
 
 function EpisodeForm({ t, db, onSubmit, openSeries }) {
   const [seriesId, setSeriesId] = useState("");
-  the:
   const [seasonId, setSeasonId] = useState("");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState(1);
