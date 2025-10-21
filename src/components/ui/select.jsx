@@ -13,11 +13,20 @@ export function Select({ value, onValueChange, children }) {
   });
   return <Ctx.Provider value={{ value, onValueChange, items }}>{children}</Ctx.Provider>;
 }
+
 export function SelectTrigger({ className = "", children }) {
   const { value, onValueChange, items } = useContext(Ctx);
   return (
-    <select className={`px-3 py-2 rounded-lg border ${className}`} value={value} onChange={(e)=>onValueChange?.(e.target.value)}>
-      {items.map((it, i) => <option key={i} value={it.value ?? it.children}>{it.children}</option>)}
+    <select
+      className={`px-3 py-2 rounded-xl border border-black/10 bg-white/80 shadow-sm ${className}`}
+      value={value}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {items.map((it, i) => (
+        <option key={i} value={it.value ?? it.children}>
+          {it.children}
+        </option>
+      ))}
     </select>
   );
 }
