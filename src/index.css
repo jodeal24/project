@@ -1,7 +1,10 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  font-family: system-ui, sans-serif;
-  background-color: #f9fafb;
-  color: #111;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional base tweaks */
+@layer base {
+  html, body {
+    @apply bg-gradient-to-b from-sky-50 via-white to-rose-50 text-zinc-900;
+  }
 }
