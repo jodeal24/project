@@ -1,31 +1,33 @@
+// src/App.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Play, Globe, LogIn, LogOut, UploadCloud, Plus, Video, Film, Languages, Captions, Headphones, Settings, X, ChevronRight, ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Search, Play, Globe, LogIn, LogOut, UploadCloud, Plus, Video, Film,
+  Captions, Headphones, Settings, X, ChevronRight, ChevronLeft, Pencil, Trash2
+} from "lucide-react";
+
+// shadcn/ui components – make sure these exist under src/components/ui/
+import { Button } from "./components/ui/button";
+import { Card, CardContent } from "./components/ui/card";
+import { Input } from "./components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
+import { Label } from "./components/ui/label";
 
 /**
- * StreamJoy — a Netflix/Disney‑like front end with:
- * - Series → Seasons → Episodes library
- * - Language switcher (top‑right)
- * - Player with subtitle & multi‑audio selection (external audio track sync)
- * - Admin‑only upload (no user logins). Uses localStorage for demo persistence.
+ * StreamJoy — Vite + React version (client-only)
+ * - Admin login via dialog (no browser prompt)
+ * - Create + Edit + Delete Series / Seasons / Episodes
+ * - Language switcher
+ * - Player with external audio sync + subtitles
+ * - Demo persistence via localStorage (per-browser)
  *
- * Notes on audio tracks:
- * Browsers have limited UI for switching audio tracks in <video>. This demo
- * supports multi‑audio by loading a separate <audio> element and syncing it to
- * the <video> (muting the video’s internal audio). In production, prefer HLS/DASH
- * with alternate audio renditions.
- *
- * To try quickly:
- * - Click Admin (top bar) → login with password: admin
- * - Create a Series, Season, Episode, and paste URLs for video/mp4, optional
- *   external .vtt subtitles and separate audio tracks (mp3/m4a). Save.
- * - Browse and play. Switch audio & subtitles in the player controls.
+ * Admin password:
+ *   const ADMIN_PW = import.meta.env.VITE_STREAMJOY_ADMIN || "admin";
+ * Set VITE_STREAMJOY_ADMIN in Vercel → Environment Variables (optional).
  */
+
+const ADMIN_PW = import.meta.env.VITE_STREAMJOY_ADMIN || "admin";
 
 // ------------------------- Simple i18n -------------------------
 const MESSAGES = {
@@ -47,6 +49,10 @@ const MESSAGES = {
     addSeries: "Add Series",
     addSeason: "Add Season",
     addEpisode: "Add Episode",
+    editSeries: "Edit Series",
+    editEpisode: "Edit Episode",
+    deleteSeries: "Delete Series",
+    deleteEpisode: "Delete Episode",
     title: "Title",
     description: "Description",
     posterUrl: "Poster URL",
@@ -64,7 +70,7 @@ const MESSAGES = {
     save: "Save",
     password: "Password",
     wrongPassword: "Wrong password",
-    familyTagline: "Family‑friendly streaming, simple and elegant",
+    familyTagline: "Family-friendly streaming, simple and elegant",
     libraryEmpty: "Your library is empty. Add a series from Admin → Add Series.",
   },
   pt: {
@@ -85,6 +91,10 @@ const MESSAGES = {
     addSeries: "Adicionar Série",
     addSeason: "Adicionar Temporada",
     addEpisode: "Adicionar Episódio",
+    editSeries: "Editar Série",
+    editEpisode: "Editar Episódio",
+    deleteSeries: "Eliminar Série",
+    deleteEpisode: "Eliminar Episódio",
     title: "Título",
     description: "Descrição",
     posterUrl: "URL do poster",
@@ -100,8 +110,8 @@ const MESSAGES = {
     confirm: "Confirmar",
     cancel: "Cancelar",
     save: "Guardar",
-    password: "Palavra‑passe",
-    wrongPassword: "Palavra‑passe incorreta",
+    password: "Palavra-passe",
+    wrongPassword: "Palavra-passe incorreta",
     familyTagline: "Streaming para a família — simples e elegante",
     libraryEmpty: "A sua biblioteca está vazia. Adicione uma série em Admin → Adicionar Série.",
   },
@@ -114,7 +124,7 @@ const MESSAGES = {
     episodes: "Épisodes",
     play: "Lecture",
     audio: "Audio",
-    subtitles: "Sous‑titres",
+    subtitles: "Sous-titres",
     off: "Désactivé",
     admin: "Admin",
     login: "Se connecter",
@@ -123,13 +133,17 @@ const MESSAGES = {
     addSeries: "Ajouter une série",
     addSeason: "Ajouter une saison",
     addEpisode: "Ajouter un épisode",
+    editSeries: "Modifier la série",
+    editEpisode: "Modifier l’épisode",
+    deleteSeries: "Supprimer la série",
+    deleteEpisode: "Supprimer l’épisode",
     title: "Titre",
     description: "Description",
     posterUrl: "URL de l’affiche",
     backdropUrl: "URL du fond (facultatif)",
     videoUrl: "URL de la vidéo (.mp4 / .m3u8)",
-    subtitleUrl: "Sous‑titres (.vtt)",
-    subtitleLang: "Code langue des sous‑titres",
+    subtitleUrl: "Sous-titres (.vtt)",
+    subtitleLang: "Code langue des sous-titres",
     audioLabel: "Libellé audio (ex.: Français)",
     audioUrl: "URL audio (mp3/m4a)",
     language: "Langue",
@@ -161,17 +175,21 @@ const MESSAGES = {
     addSeries: "Serie hinzufügen",
     addSeason: "Staffel hinzufügen",
     addEpisode: "Episode hinzufügen",
+    editSeries: "Serie bearbeiten",
+    editEpisode: "Episode bearbeiten",
+    deleteSeries: "Serie löschen",
+    deleteEpisode: "Episode löschen",
     title: "Titel",
     description: "Beschreibung",
-    posterUrl: "Poster‑URL",
-    backdropUrl: "Backdrop‑URL (optional)",
-    videoUrl: "Video‑URL (.mp4 / .m3u8)",
+    posterUrl: "Poster-URL",
+    backdropUrl: "Backdrop-URL (optional)",
+    videoUrl: "Video-URL (.mp4 / .m3u8)",
     subtitleUrl: "Untertitel (.vtt)",
-    subtitleLang: "Untertitel‑Sprachcode",
-    audioLabel: "Audio‑Bezeichnung (z. B. Deutsch)",
-    audioUrl: "Audio‑URL (mp3/m4a)",
+    subtitleLang: "Untertitel-Sprachcode",
+    audioLabel: "Audio-Bezeichnung (z. B. Deutsch)",
+    audioUrl: "Audio-URL (mp3/m4a)",
     language: "Sprache",
-    interfaceLanguage: "Interface‑Sprache",
+    interfaceLanguage: "Interface-Sprache",
     chooseLanguage: "Sprache wählen",
     confirm: "Bestätigen",
     cancel: "Abbrechen",
@@ -199,15 +217,19 @@ const MESSAGES = {
     addSeries: "Serie derbäisetzen",
     addSeason: "Staffel derbäisetzen",
     addEpisode: "Episod derbäisetzen",
+    editSeries: "Serie änneren",
+    editEpisode: "Episod änneren",
+    deleteSeries: "Serie läschen",
+    deleteEpisode: "Episod läschen",
     title: "Titel",
     description: "Beschreiwung",
-    posterUrl: "Poster‑URL",
-    backdropUrl: "Hannergrond‑URL (optional)",
-    videoUrl: "Video‑URL (.mp4 / .m3u8)",
+    posterUrl: "Poster-URL",
+    backdropUrl: "Hannergrond-URL (optional)",
+    videoUrl: "Video-URL (.mp4 / .m3u8)",
     subtitleUrl: "Ënnertitelen (.vtt)",
     subtitleLang: "Sproochcode vun den Ënnertitelen",
-    audioLabel: "Audio‑Label (z. B. Lëtzebuergesch)",
-    audioUrl: "Audio‑URL (mp3/m4a)",
+    audioLabel: "Audio-Label (z. B. Lëtzebuergesch)",
+    audioUrl: "Audio-URL (mp3/m4a)",
     language: "Sprooch",
     interfaceLanguage: "Sprooch vun der Interface",
     chooseLanguage: "Sprooch wielen",
@@ -224,11 +246,11 @@ const MESSAGES = {
 // ------------------------- Demo storage -------------------------
 const STORAGE_KEY = "streamjoy_db_v1";
 
-function loadDB() {
+function safeLoadDB() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : { series: [] };
-  } catch (e) {
+  } catch {
     return { series: [] };
   }
 }
@@ -236,7 +258,7 @@ function saveDB(db) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
 }
 
-// Data shapes
+// Data shapes (comment):
 // Series: { id, title, description, posterUrl, backdropUrl, seasons: [Season] }
 // Season: { id, number, episodes: [Episode] }
 // Episode: { id, title, number, description, videoUrl, audios:[{label,url}], subtitles:[{lang,url}] }
@@ -254,7 +276,10 @@ const Section = ({ title, children, icon: Icon }) => (
 
 const PosterCard = ({ item, onClick }) => (
   <Card className="bg-white/5 hover:bg-white/10 transition rounded-2xl overflow-hidden cursor-pointer" onClick={onClick}>
-    <div className="aspect-[2/3] w-40 md:w-44 lg:w-48 bg-white/5" style={{backgroundImage: `url(${item.posterUrl || ""})`, backgroundSize: 'cover', backgroundPosition: 'center'}} />
+    <div
+      className="aspect-[2/3] w-40 md:w-44 lg:w-48 bg-white/5"
+      style={{ backgroundImage: `url(${item.posterUrl || ""})`, backgroundSize: "cover", backgroundPosition: "center" }}
+    />
     <CardContent className="p-3">
       <div className="text-sm font-medium line-clamp-2">{item.title}</div>
     </CardContent>
@@ -268,12 +293,16 @@ const Row = ({ title, items, onItem }) => {
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-lg font-semibold">{title}</h3>
         <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={() => scrollRef.current?.scrollBy({ left: -400, behavior: 'smooth' })}><ChevronLeft /></Button>
-          <Button variant="ghost" size="icon" onClick={() => scrollRef.current?.scrollBy({ left: 400, behavior: 'smooth' })}><ChevronRight /></Button>
+          <Button variant="ghost" size="icon" onClick={() => scrollRef.current?.scrollBy({ left: -400, behavior: "smooth" })}>
+            <ChevronLeft />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => scrollRef.current?.scrollBy({ left: 400, behavior: "smooth" })}>
+            <ChevronRight />
+          </Button>
         </div>
       </div>
       <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-2">
-        {items.map(s => (
+        {items.map((s) => (
           <PosterCard key={s.id} item={s} onClick={() => onItem(s)} />
         ))}
       </div>
@@ -281,14 +310,13 @@ const Row = ({ title, items, onItem }) => {
   );
 };
 
-// ------------------------- Player with multi‑audio & subs -------------------------
+// ------------------------- Player with multi-audio & subs -------------------------
 function Player({ episode, t, onClose }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const [audioSelection, setAudioSelection] = useState("video"); // "video" or index into episode.audios
   const [subSelection, setSubSelection] = useState("off"); // lang or "off"
 
-  // Keep audio element synced to video when using external audio track
   useEffect(() => {
     const v = videoRef.current;
     const a = audioRef.current;
@@ -307,16 +335,16 @@ function Player({ episode, t, onClose }) {
     const onSeek = () => { if (audioSelection !== "video") a.currentTime = v.currentTime; };
 
     const int = setInterval(sync, 500);
-    v.addEventListener('play', onPlay);
-    v.addEventListener('pause', onPause);
-    v.addEventListener('seeking', onSeek);
-    v.addEventListener('ratechange', () => { if (audioSelection !== "video") a.playbackRate = v.playbackRate; });
+    v.addEventListener("play", onPlay);
+    v.addEventListener("pause", onPause);
+    v.addEventListener("seeking", onSeek);
+    v.addEventListener("ratechange", () => { if (audioSelection !== "video") a.playbackRate = v.playbackRate; });
 
     return () => {
       clearInterval(int);
-      v.removeEventListener('play', onPlay);
-      v.removeEventListener('pause', onPause);
-      v.removeEventListener('seeking', onSeek);
+      v.removeEventListener("play", onPlay);
+      v.removeEventListener("pause", onPause);
+      v.removeEventListener("seeking", onSeek);
     };
   }, [audioSelection]);
 
@@ -336,19 +364,28 @@ function Player({ episode, t, onClose }) {
   }, [audioSelection]);
 
   return (
-    <Dialog open onOpenChange={open => { if (!open) onClose?.(); }}>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose?.(); }}>
       <DialogContent className="max-w-5xl p-0 overflow-hidden bg-black text-white">
         <div className="relative">
           <video ref={videoRef} className="w-full bg-black" controls poster={episode.backdropUrl || episode.posterUrl}>
             <source src={episode.videoUrl} />
-            {episode.subtitles?.filter(s => s.lang === subSelection).map((s, idx) => (
-              <track key={idx} label={s.lang} kind="subtitles" srcLang={s.lang} src={s.url} default />
-            ))}
+            {subSelection !== "off" &&
+              episode.subtitles?.filter((s) => s.lang === subSelection).map((s, idx) => (
+                <track key={idx} label={s.lang} kind="subtitles" srcLang={s.lang} src={s.url} default />
+              ))}
           </video>
+
           {/* External audio element for alternate languages */}
           <audio ref={audioRef} src={audioSelection === "video" ? undefined : episode.audios?.[parseInt(audioSelection)]?.url} />
 
-          <Button variant="secondary" size="icon" className="absolute top-3 right-3 bg-white/10 hover:bg-white/20 border-white/20" onClick={onClose}><X /></Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute top-3 right-3 bg-white/10 hover:bg-white/20 border-white/20"
+            onClick={onClose}
+          >
+            <X />
+          </Button>
         </div>
 
         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 bg-gradient-to-b from-black to-zinc-900">
@@ -401,25 +438,46 @@ function AdminPanel({ db, setDB, t }) {
 
   const addSeries = (s) => {
     const next = { ...db, series: [...db.series, { ...s, id: crypto.randomUUID(), seasons: [] }] };
-    setDB(next);
-    saveDB(next);
+    setDB(next); saveDB(next);
+  };
+  const updateSeries = (seriesId, patch) => {
+    const next = { ...db, series: db.series.map((s) => (s.id === seriesId ? { ...s, ...patch } : s)) };
+    setDB(next); saveDB(next);
+  };
+  const deleteSeries = (seriesId) => {
+    const next = { ...db, series: db.series.filter((s) => s.id !== seriesId) };
+    setDB(next); saveDB(next);
   };
   const addSeason = (seriesId, number) => {
     const next = { ...db };
-    const s = next.series.find(x => x.id === seriesId);
+    const s = next.series.find((x) => x.id === seriesId);
     if (!s) return;
     s.seasons.push({ id: crypto.randomUUID(), number, episodes: [] });
-    setDB(next);
-    saveDB(next);
+    setDB(next); saveDB(next);
   };
   const addEpisode = (seriesId, seasonId, ep) => {
     const next = { ...db };
-    const s = next.series.find(x => x.id === seriesId);
-    const se = s?.seasons.find(x => x.id === seasonId);
+    const s = next.series.find((x) => x.id === seriesId);
+    const se = s?.seasons.find((x) => x.id === seasonId);
     if (!se) return;
     se.episodes.push({ id: crypto.randomUUID(), ...ep });
-    setDB(next);
-    saveDB(next);
+    setDB(next); saveDB(next);
+  };
+  const updateEpisode = (seriesId, seasonId, episodeId, patch) => {
+    const next = { ...db };
+    const s = next.series.find((x) => x.id === seriesId);
+    const se = s?.seasons.find((x) => x.id === seasonId);
+    if (!se) return;
+    se.episodes = se.episodes.map((e) => (e.id === episodeId ? { ...e, ...patch } : e));
+    setDB(next); saveDB(next);
+  };
+  const deleteEpisode = (seriesId, seasonId, episodeId) => {
+    const next = { ...db };
+    const s = next.series.find((x) => x.id === seriesId);
+    const se = s?.seasons.find((x) => x.id === seasonId);
+    if (!se) return;
+    se.episodes = se.episodes.filter((e) => e.id !== episodeId);
+    setDB(next); saveDB(next);
   };
 
   return (
@@ -434,6 +492,17 @@ function AdminPanel({ db, setDB, t }) {
           <EpisodeForm t={t} db={db} onSubmit={addEpisode} openSeries={openSeries} />
         </div>
       </Section>
+
+      <Section title={"Manage Library"} icon={Settings}>
+        <ManageLibrary
+          t={t}
+          db={db}
+          updateSeries={updateSeries}
+          deleteSeries={deleteSeries}
+          updateEpisode={updateEpisode}
+          deleteEpisode={deleteEpisode}
+        />
+      </Section>
     </div>
   );
 }
@@ -446,11 +515,17 @@ function SeriesForm({ t, onSubmit }) {
 
   return (
     <div className="grid gap-3 p-4 rounded-2xl bg-white/5">
-      <Input placeholder={t.title} value={title} onChange={e => setTitle(e.target.value)} />
-      <Input placeholder={t.description} value={description} onChange={e => setDescription(e.target.value)} />
-      <Input placeholder={t.posterUrl} value={posterUrl} onChange={e => setPosterUrl(e.target.value)} />
-      <Input placeholder={t.backdropUrl} value={backdropUrl} onChange={e => setBackdropUrl(e.target.value)} />
-      <Button onClick={() => { if (!title) return; onSubmit({ title, description, posterUrl, backdropUrl }); setTitle(""); setDescription(""); setPosterUrl(""); setBackdropUrl(""); }}>
+      <Input placeholder={t.title} value={title} onChange={(e) => setTitle(e.target.value)} />
+      <Input placeholder={t.description} value={description} onChange={(e) => setDescription(e.target.value)} />
+      <Input placeholder={t.posterUrl} value={posterUrl} onChange={(e) => setPosterUrl(e.target.value)} />
+      <Input placeholder={t.backdropUrl} value={backdropUrl} onChange={(e) => setBackdropUrl(e.target.value)} />
+      <Button
+        onClick={() => {
+          if (!title) return;
+          onSubmit({ title, description, posterUrl, backdropUrl });
+          setTitle(""); setDescription(""); setPosterUrl(""); setBackdropUrl("");
+        }}
+      >
         <Plus className="w-4 h-4 mr-2" /> {t.addSeries}
       </Button>
     </div>
@@ -466,12 +541,16 @@ function SeasonForm({ t, db, onSubmit, onOpenSeries }) {
   return (
     <div className="grid gap-3 p-4 rounded-2xl bg-white/5">
       <Select value={seriesId} onValueChange={(v) => { setSeriesId(v); onOpenSeries(v); }}>
-        <SelectTrigger className="bg-white/10 border-white/10"><SelectValue placeholder={t.series} /></SelectTrigger>
+        <SelectTrigger className="bg-white/10 border-white/10">
+          <SelectValue placeholder={t.series} />
+        </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-white/10">
-          {series.map(s => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
+          {series.map((s) => (
+            <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+          ))}
         </SelectContent>
       </Select>
-      <Input type="number" min={1} value={number} onChange={e => setNumber(parseInt(e.target.value || "1"))} placeholder={t.season} />
+      <Input type="number" min={1} value={number} onChange={(e) => setNumber(parseInt(e.target.value || "1"))} placeholder={t.season} />
       <Button disabled={!seriesId} onClick={() => { if (!seriesId) return; onSubmit(seriesId, number); }}>
         <Plus className="w-4 h-4 mr-2" /> {t.addSeason}
       </Button>
@@ -481,6 +560,7 @@ function SeasonForm({ t, db, onSubmit, onOpenSeries }) {
 
 function EpisodeForm({ t, db, onSubmit, openSeries }) {
   const [seriesId, setSeriesId] = useState("");
+  the:
   const [seasonId, setSeasonId] = useState("");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState(1);
@@ -490,46 +570,54 @@ function EpisodeForm({ t, db, onSubmit, openSeries }) {
   const [audios, setAudios] = useState([]); // {label,url}
   const [subtitles, setSubtitles] = useState([]); // {lang,url}
 
-  useEffect(() => {
-    if (openSeries) setSeriesId(openSeries);
-  }, [openSeries]);
+  useEffect(() => { if (openSeries) setSeriesId(openSeries); }, [openSeries]);
 
   const series = db.series;
-  const seasons = series.find(s => s.id === seriesId)?.seasons || [];
+  const seasons = series.find((s) => s.id === seriesId)?.seasons || [];
 
-  const addAudio = () => setAudios(prev => [...prev, { label: "", url: "" }]);
-  const addSub = () => setSubtitles(prev => [...prev, { lang: "en", url: "" }]);
+  const addAudio = () => setAudios((prev) => [...prev, { label: "", url: "" }]);
+  const addSub = () => setSubtitles((prev) => [...prev, { lang: "en", url: "" }]);
 
   return (
     <div className="grid gap-3 p-4 rounded-2xl bg-white/5">
       <Select value={seriesId} onValueChange={setSeriesId}>
-        <SelectTrigger className="bg-white/10 border-white/10"><SelectValue placeholder={t.series} /></SelectTrigger>
+        <SelectTrigger className="bg-white/10 border-white/10">
+          <SelectValue placeholder={t.series} />
+        </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-white/10">
-          {series.map(s => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
+          {series.map((s) => (
+            <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
       <Select value={seasonId} onValueChange={setSeasonId}>
-        <SelectTrigger className="bg-white/10 border-white/10"><SelectValue placeholder={t.season} /></SelectTrigger>
+        <SelectTrigger className="bg-white/10 border-white/10">
+          <SelectValue placeholder={t.season} />
+        </SelectTrigger>
         <SelectContent className="bg-zinc-800 border-white/10">
-          {seasons.map(se => <SelectItem key={se.id} value={se.id}>{t.season} {se.number}</SelectItem>)}
+          {seasons.map((se) => (
+            <SelectItem key={se.id} value={se.id}>{t.season} {se.number}</SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Input placeholder={`${t.title}`} value={title} onChange={e => setTitle(e.target.value)} />
-        <Input type="number" min={1} placeholder="#" value={number} onChange={e => setNumber(parseInt(e.target.value || "1"))} />
+        <Input placeholder={`${t.title}`} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Input type="number" min={1} placeholder="#" value={number} onChange={(e) => setNumber(parseInt(e.target.value || "1"))} />
       </div>
-      <Input placeholder={t.description} value={description} onChange={e => setDescription(e.target.value)} />
-      <Input placeholder={t.videoUrl} value={videoUrl} onChange={e => setVideoUrl(e.target.value)} />
+      <Input placeholder={t.description} value={description} onChange={(e) => setDescription(e.target.value)} />
+      <Input placeholder={t.videoUrl} value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} />
 
       <div className="bg-white/5 rounded-xl p-3">
-        <div className="flex items-center gap-2 mb-2"><Headphones className="w-4 h-4" /><span className="font-medium">{t.audio}</span></div>
+        <div className="flex items-center gap-2 mb-2">
+          <Headphones className="w-4 h-4" /><span className="font-medium">{t.audio}</span>
+        </div>
         <div className="space-y-2">
           {audios.map((a, idx) => (
             <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Input placeholder={t.audioLabel} value={a.label} onChange={e => setAudios(prev => prev.map((x, i) => i === idx ? { ...x, label: e.target.value } : x))} />
-              <Input placeholder={t.audioUrl} value={a.url} onChange={e => setAudios(prev => prev.map((x, i) => i === idx ? { ...x, url: e.target.value } : x))} />
+              <Input placeholder={t.audioLabel} value={a.label} onChange={(e) => setAudios((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))} />
+              <Input placeholder={t.audioUrl} value={a.url} onChange={(e) => setAudios((prev) => prev.map((x, i) => (i === idx ? { ...x, url: e.target.value } : x)))} />
             </div>
           ))}
           <Button variant="outline" onClick={addAudio}><Plus className="w-4 h-4 mr-2" /> {t.audio}</Button>
@@ -537,24 +625,106 @@ function EpisodeForm({ t, db, onSubmit, openSeries }) {
       </div>
 
       <div className="bg-white/5 rounded-xl p-3">
-        <div className="flex items-center gap-2 mb-2"><Captions className="w-4 h-4" /><span className="font-medium">{t.subtitles}</span></div>
+        <div className="flex items-center gap-2 mb-2">
+          <Captions className="w-4 h-4" /><span className="font-medium">{t.subtitles}</span>
+        </div>
         <div className="space-y-2">
           {subtitles.map((s, idx) => (
             <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Input placeholder={t.subtitleLang} value={s.lang} onChange={e => setSubtitles(prev => prev.map((x, i) => i === idx ? { ...x, lang: e.target.value } : x))} />
-              <Input placeholder={t.subtitleUrl} value={s.url} onChange={e => setSubtitles(prev => prev.map((x, i) => i === idx ? { ...x, url: e.target.value } : x))} />
+              <Input placeholder={t.subtitleLang} value={s.lang} onChange={(e) => setSubtitles((prev) => prev.map((x, i) => (i === idx ? { ...x, lang: e.target.value } : x)))} />
+              <Input placeholder={t.subtitleUrl} value={s.url} onChange={(e) => setSubtitles((prev) => prev.map((x, i) => (i === idx ? { ...x, url: e.target.value } : x)))} />
             </div>
           ))}
           <Button variant="outline" onClick={addSub}><Plus className="w-4 h-4 mr-2" /> {t.subtitles}</Button>
         </div>
       </div>
 
-      <Button disabled={!seriesId || !seasonId || !title || !videoUrl} onClick={() => {
-        onSubmit(seriesId, seasonId, { title, number, description, videoUrl, audios, subtitles });
-        setTitle(""); setNumber(1); setDescription(""); setVideoUrl(""); setAudios([]); setSubtitles([]);
-      }}>
+      <Button
+        disabled={!seriesId || !seasonId || !title || !videoUrl}
+        onClick={() => {
+          onSubmit(seriesId, seasonId, { title, number, description, videoUrl, audios, subtitles });
+          setTitle(""); setNumber(1); setDescription(""); setVideoUrl(""); setAudios([]); setSubtitles([]);
+        }}
+      >
         <UploadCloud className="w-4 h-4 mr-2" /> {t.addEpisode}
       </Button>
+    </div>
+  );
+}
+
+function ManageLibrary({ t, db, updateSeries, deleteSeries, updateEpisode, deleteEpisode }) {
+  const [editingSeriesId, setEditingSeriesId] = useState(null);
+  const [editingEpisode, setEditingEpisode] = useState(null); // { seriesId, seasonId, ep }
+
+  const series = db.series;
+
+  return (
+    <div className="space-y-6">
+      {series.length === 0 && <div className="text-sm opacity-70">{t.libraryEmpty}</div>}
+
+      {series.map((s) => (
+        <div key={s.id} className="rounded-2xl border border-black/10 p-4 bg-white/50">
+          {editingSeriesId === s.id ? (
+            <div className="grid md:grid-cols-2 gap-2 mb-3">
+              <Input defaultValue={s.title} onChange={(e) => (s.title = e.target.value)} />
+              <Input defaultValue={s.posterUrl} onChange={(e) => (s.posterUrl = e.target.value)} />
+              <Input defaultValue={s.backdropUrl} onChange={(e) => (s.backdropUrl = e.target.value)} />
+              <Input defaultValue={s.description} onChange={(e) => (s.description = e.target.value)} />
+              <div className="flex gap-2 col-span-full">
+                <Button onClick={() => { updateSeries(s.id, s); setEditingSeriesId(null); }}>{t.save}</Button>
+                <Button variant="outline" onClick={() => setEditingSeriesId(null)}>{t.cancel}</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold">{s.title}</div>
+                {s.description && <div className="text-sm opacity-70">{s.description}</div>}
+              </div>
+              <div className="flex gap-2">
+                <Button size="icon" variant="ghost" onClick={() => setEditingSeriesId(s.id)}><Pencil /></Button>
+                <Button size="icon" variant="ghost" onClick={() => deleteSeries(s.id)}><Trash2 /></Button>
+              </div>
+            </div>
+          )}
+
+          {s.seasons?.sort((a, b) => a.number - b.number).map((season) => (
+            <div key={season.id} className="mt-3">
+              <div className="font-medium mb-1">{MESSAGES.en.season} {season.number}</div>
+              <div className="space-y-2">
+                {season.episodes?.sort((a, b) => a.number - b.number).map((ep) => (
+                  <div key={ep.id} className="rounded-xl bg-white/70 p-3">
+                    {editingEpisode && editingEpisode.ep.id === ep.id ? (
+                      <div className="grid md:grid-cols-2 gap-2">
+                        <Input defaultValue={ep.title} onChange={(e) => (ep.title = e.target.value)} />
+                        <Input type="number" defaultValue={ep.number} onChange={(e) => (ep.number = parseInt(e.target.value || "1"))} />
+                        <Input defaultValue={ep.description} onChange={(e) => (ep.description = e.target.value)} />
+                        <Input defaultValue={ep.videoUrl} onChange={(e) => (ep.videoUrl = e.target.value)} />
+                        <div className="col-span-full flex gap-2">
+                          <Button onClick={() => { updateEpisode(s.id, season.id, ep.id, ep); setEditingEpisode(null); }}>{t.save}</Button>
+                          <Button variant="outline" onClick={() => setEditingEpisode(null)}>{t.cancel}</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3">
+                        <div className="w-16 h-10 rounded bg-gradient-to-br from-indigo-200 to-sky-200" />
+                        <div className="flex-1">
+                          <div className="font-medium">{ep.number}. {ep.title}</div>
+                          {ep.description && <div className="text-sm text-zinc-600 line-clamp-2">{ep.description}</div>}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setEditingEpisode({ seriesId: s.id, seasonId: season.id, ep })}><Pencil /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => deleteEpisode(s.id, season.id, ep.id)}><Trash2 /></Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -565,7 +735,7 @@ export default function App() {
   const t = MESSAGES[lang] || MESSAGES.en;
   useEffect(() => { localStorage.setItem("sj_lang", lang); }, [lang]);
 
-  const [db, setDB] = useState(loadDB);
+  const [db, setDB] = useState(safeLoadDB());
   const [query, setQuery] = useState("");
   const [admin, setAdmin] = useState(() => localStorage.getItem("sj_admin") === "1");
 
@@ -575,13 +745,20 @@ export default function App() {
   const filteredSeries = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return db.series;
-    return db.series.filter(s => s.title.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q));
+    return db.series.filter((s) => s.title.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q));
   }, [db, query]);
 
-  const login = () => {
-    const pw = prompt(`${t.password}`);
-    if (pw === "admin") { setAdmin(true); localStorage.setItem("sj_admin", "1"); }
-    else alert(t.wrongPassword);
+  // Admin login dialog state
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [pwInput, setPwInput] = useState("");
+  const [pwError, setPwError] = useState("");
+
+  const tryLogin = () => {
+    if (pwInput.trim() === ADMIN_PW) {
+      setAdmin(true); localStorage.setItem("sj_admin", "1"); setLoginOpen(false); setPwError(""); setPwInput("");
+    } else {
+      setPwError(t.wrongPassword);
+    }
   };
   const logout = () => { setAdmin(false); localStorage.removeItem("sj_admin"); };
 
@@ -602,7 +779,7 @@ export default function App() {
 
           <div className="hidden md:flex items-center gap-2 mr-2">
             <div className="relative w-64">
-              <Input className="pl-8" placeholder={t.search + "…"} value={query} onChange={e => setQuery(e.target.value)} />
+              <Input className="pl-8" placeholder={t.search + "…"} value={query} onChange={(e) => setQuery(e.target.value)} />
               <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
             </div>
           </div>
@@ -626,7 +803,7 @@ export default function App() {
           {admin ? (
             <Button variant="outline" className="ml-2" onClick={logout}><LogOut className="w-4 h-4 mr-2" /> {t.logout}</Button>
           ) : (
-            <Button variant="outline" className="ml-2" onClick={login}><LogIn className="w-4 h-4 mr-2" /> {t.login}</Button>
+            <Button variant="outline" className="ml-2" onClick={() => setLoginOpen(true)}><LogIn className="w-4 h-4 mr-2" /> {t.login}</Button>
           )}
         </div>
       </header>
@@ -646,10 +823,13 @@ export default function App() {
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
                     <DialogHeader><DialogTitle>{t.addSeries}</DialogTitle></DialogHeader>
-                    <SeriesForm t={t} onSubmit={(s) => {
-                      const next = { ...db, series: [...db.series, { ...s, id: crypto.randomUUID(), seasons: [] }] };
-                      setDB(next); saveDB(next);
-                    }} />
+                    <SeriesForm
+                      t={t}
+                      onSubmit={(s) => {
+                        const next = { ...db, series: [...db.series, { ...s, id: crypto.randomUUID(), seasons: [] }] };
+                        setDB(next); saveDB(next);
+                      }}
+                    />
                   </DialogContent>
                 </Dialog>
               )}
@@ -679,10 +859,16 @@ export default function App() {
       <AnimatePresence>
         {selectedSeries && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-30 flex">
-            <motion.aside initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} className="ml-auto h-full w-full max-w-3xl bg-white rounded-l-2xl overflow-y-auto">
+            <motion.aside
+              initial={{ x: 40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 40, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 120, damping: 20 }}
+              className="ml-auto h-full w-full max-w-3xl bg-white rounded-l-2xl overflow-y-auto"
+            >
               <div className="relative">
                 {selectedSeries.backdropUrl ? (
-                  <div className="h-48 md:h-64 w-full" style={{backgroundImage:`url(${selectedSeries.backdropUrl})`, backgroundSize:'cover', backgroundPosition:'center'}} />
+                  <div className="h-48 md:h-64 w-full" style={{ backgroundImage: `url(${selectedSeries.backdropUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
                 ) : (
                   <div className="h-48 md:h-64 w-full bg-gradient-to-br from-indigo-100 to-sky-100" />
                 )}
@@ -690,18 +876,21 @@ export default function App() {
               </div>
               <div className="p-5">
                 <div className="flex gap-4">
-                  <div className="w-28 flex-shrink-0 rounded-xl overflow-hidden" style={{backgroundImage:`url(${selectedSeries.posterUrl})`, backgroundSize:'cover', backgroundPosition:'center'}}>
+                  <div
+                    className="w-28 flex-shrink-0 rounded-xl overflow-hidden"
+                    style={{ backgroundImage: `url(${selectedSeries.posterUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                  >
                     <div className="aspect-[2/3]" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-2xl font-bold mb-1">{selectedSeries.title}</h3>
                     {selectedSeries.description && <p className="text-zinc-700 mb-3">{selectedSeries.description}</p>}
                     <div className="space-y-5">
-                      {selectedSeries.seasons?.sort((a,b)=>a.number-b.number).map(season => (
+                      {selectedSeries.seasons?.sort((a, b) => a.number - b.number).map((season) => (
                         <div key={season.id}>
-                          <div className="font-semibold mb-2">{t.season} {season.number}</div>
+                          <div className="font-semibold mb-2">{MESSAGES[lang].season} {season.number}</div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {season.episodes?.sort((a,b)=>a.number-b.number).map(ep => (
+                            {season.episodes?.sort((a, b) => a.number - b.number).map((ep) => (
                               <Card key={ep.id} className="bg-white/60 hover:bg-white/80 transition cursor-pointer" onClick={() => setSelectedEpisode(ep)}>
                                 <CardContent className="p-4">
                                   <div className="flex items-start gap-3">
@@ -728,9 +917,31 @@ export default function App() {
       </AnimatePresence>
 
       {/* Player Modal */}
-      {selectedEpisode && (
-        <Player episode={selectedEpisode} t={t} onClose={() => setSelectedEpisode(null)} />)
-      }
+      {selectedEpisode && <Player episode={selectedEpisode} t={t} onClose={() => setSelectedEpisode(null)} />}
+
+      {/* Admin login dialog */}
+      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t.login}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="pw">{t.password}</Label>
+            <Input
+              id="pw"
+              type="password"
+              value={pwInput}
+              onChange={(e) => setPwInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") tryLogin(); }}
+            />
+            {pwError && <div className="text-sm text-red-600">{pwError}</div>}
+            <div className="flex gap-2 justify-end mt-2">
+              <Button variant="outline" onClick={() => setLoginOpen(false)}>{t.cancel}</Button>
+              <Button onClick={tryLogin}>{t.login}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <footer className="border-t border-black/5 mt-16">
         <div className="max-w-6xl mx-auto px-4 py-8 text-sm text-zinc-600 flex items-center justify-between">
